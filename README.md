@@ -2,10 +2,6 @@
 
 Interactive terminal UI for Tailscale — status at a glance, bring up/down, switch exit nodes, without touching the CLI directly.
 
-## Why
-
-`tailscale` CLI works but is tedious for day-to-day use. trayscale requires a desktop tray. clairscale lives in the terminal, fast and keyboard-driven.
-
 ## Features
 
 - Live Tailscale status dashboard (peers, IPs, connection state)
@@ -19,8 +15,6 @@ Interactive terminal UI for Tailscale — status at a glance, bring up/down, swi
 **Requirements:** Go 1.21+
 
 ```sh
-git clone https://github.com/lesterhan/clairscale
-cd clairscale
 go install ./cmd/clairscale
 ```
 
