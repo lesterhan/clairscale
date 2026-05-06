@@ -14,6 +14,8 @@ func (m Model) View() string {
 		return viewDaemonDown()
 	case screenDashboard:
 		return viewDashboard(m)
+	case screenPeerList:
+		return viewPeerList(m.peerList)
 	}
 	return ""
 }
@@ -49,7 +51,7 @@ func viewDashboard(m Model) string {
 	}
 
 	online, offline := 0, 0
-	for _, p := range s.Peer {
+	for _, p := range tailnetPeers(m.status) {
 		if p.Online {
 			online++
 		} else {

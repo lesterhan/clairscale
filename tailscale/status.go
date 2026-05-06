@@ -13,6 +13,7 @@ const defaultSocketPath = "/var/run/tailscale/tailscaled.sock"
 
 type PeerStatus struct {
 	HostName       string    `json:"HostName"`
+	DNSName        string    `json:"DNSName"`
 	TailscaleIPs   []string  `json:"TailscaleIPs"`
 	OS             string    `json:"OS"`
 	Online         bool      `json:"Online"`
@@ -29,7 +30,8 @@ type SelfStatus struct {
 }
 
 type TailnetStatus struct {
-	Name string `json:"Name"`
+	Name           string `json:"Name"`
+	MagicDNSSuffix string `json:"MagicDNSSuffix"`
 }
 
 type ExitNodeStatus struct {
