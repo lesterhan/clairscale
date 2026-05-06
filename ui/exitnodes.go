@@ -191,28 +191,31 @@ func (m exitNodeModel) update(msg tea.Msg) (exitNodeModel, tea.Cmd) {
 func viewExitNodes(m exitNodeModel) string {
 	visible := m.filteredRows()
 
-	activeLabel := "none"
+	activeLabel := styleDim.Render("none")
 	for _, r := range m.allRows {
 		if r.active && r.ip != "" {
-			activeLabel = r.hostName
+			activeLabel = styleActive.Render(r.hostName)
 			break
 		}
 	}
 
 	var b strings.Builder
 	fmt.Fprintln(&b)
-	fmt.Fprintf(&b, "  Active: %s\n", activeLabel)
+	fmt.Fprintf(&b, "  %s %s\n", styleLabel.Render("Active:"), activeLabel)
 	fmt.Fprintln(&b)
 
 	if m.filterText != "" {
 		peers := len(visible) - 1
-		fmt.Fprintf(&b, "  filter: %s_    %d result", m.filterText, peers)
-		if peers != 1 {
-			fmt.Fprint(&b, "s")
+		suffix := "s"
+		if peers == 1 {
+			suffix = ""
 		}
-		fmt.Fprintln(&b)
+		fmt.Fprintf(&b, "  %s    %s\n",
+			styleFilter.Render("filter: "+m.filterText+"_"),
+			styleDim.Render(fmt.Sprintf("%d result%s", peers, suffix)),
+		)
 	} else {
-		fmt.Fprintln(&b, "  type to filter by name, country, or city")
+		fmt.Fprintln(&b, "  "+styleDim.Render("type to filter by name, country, or city"))
 	}
 	fmt.Fprintln(&b)
 
@@ -224,37 +227,54 @@ func viewExitNodes(m exitNodeModel) string {
 
 	for i := m.offset; i < end; i++ {
 		r := visible[i]
-
-		cursor := "  "
-		if i == m.cursor {
-			cursor = "▶ "
-		}
-
-		dot := "○"
-		if r.online {
-			dot = "●"
-		}
-
-		check := ""
-		if r.active {
-			check = "✓"
-		}
-
-		if r.ip == "" {
-			fmt.Fprintf(&b, "%s%s %s\n", cursor, dot, r.hostName)
-		} else {
-			fmt.Fprintf(&b, "%s%s %-22s %-16s %-18s %-16s %s\n",
-				cursor, dot, r.hostName, r.ip, r.country, r.city, check)
-		}
+		isSelected := i == m.cursor
+		fmt.Fprintln(&b, exitNodeRowStr(r, isSelected))
 	}
 
 	fmt.Fprintln(&b)
 	if m.setting {
-		fmt.Fprintln(&b, "  Connecting...")
+		fmt.Fprintln(&b, "  "+styleWarning.Render("Connecting..."))
 	} else if m.err != "" {
-		fmt.Fprintf(&b, "  Error: %s\n", m.err)
+		fmt.Fprintf(&b, "  %s\n", styleError.Render("Error: "+m.err))
 	}
 
-	fmt.Fprintln(&b, "  [↑↓] navigate   [enter] connect   [esc] clear/back")
+	fmt.Fprintln(&b, "  "+styleDim.Render("[↑↓] navigate   [enter] connect   [esc] clear/back"))
 	return b.String()
+}
+
+func exitNodeRowStr(r exitNodeRow, isSelected bool) string {
+	dot := styleOffline.Render("○")
+	if r.ip == "" {
+		// "none" row always gets a plain dot
+		name := r.hostName
+		if isSelected {
+			name = styleBold.Render(name)
+		}
+		return cursor(isSelected) + dot + " " + name
+	}
+	if r.online {
+		dot = styleOnline.Render("●")
+	}
+
+	hn := fmt.Sprintf("%-22s", r.hostName)
+	ip := styleDim.Render(fmt.Sprintf("%-16s", r.ip))
+	country := fmt.Sprintf("%-18s", r.country)
+	city := fmt.Sprintf("%-16s", r.city)
+	check := "  "
+
+	if r.active {
+		hn = styleActive.Render(hn)
+		country = styleActive.Render(country)
+		city = styleActive.Render(city)
+		check = " " + styleActive.Render("✓")
+	} else if isSelected {
+		hn = styleBold.Render(hn)
+		country = styleBold.Render(country)
+		city = styleBold.Render(city)
+	} else {
+		country = styleDim.Render(country)
+		city = styleDim.Render(city)
+	}
+
+	return cursor(isSelected) + dot + " " + hn + " " + ip + " " + country + " " + city + check
 }

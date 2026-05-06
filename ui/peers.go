@@ -160,10 +160,17 @@ func viewPeerList(m peerListModel) string {
 	var b strings.Builder
 	fmt.Fprintln(&b)
 
+	header := fmt.Sprintf("%s · %s",
+		styleOnline.Render(fmt.Sprintf("%d online", online)),
+		styleOffline.Render(fmt.Sprintf("%d offline", offline)),
+	)
 	if m.filtering {
-		fmt.Fprintf(&b, "  %d online · %d offline    filter: %s_\n", online, offline, m.filterText)
+		fmt.Fprintf(&b, "  %s    %s\n",
+			header,
+			styleFilter.Render("filter: "+m.filterText+"_"),
+		)
 	} else {
-		fmt.Fprintf(&b, "  %d online · %d offline    [/] filter\n", online, offline)
+		fmt.Fprintf(&b, "  %s    %s\n", header, styleDim.Render("[/] filter"))
 	}
 	fmt.Fprintln(&b)
 
@@ -174,33 +181,35 @@ func viewPeerList(m peerListModel) string {
 
 	for i := m.offset; i < end; i++ {
 		p := visible[i]
-
-		cursor := "  "
-		if i == m.cursor {
-			cursor = "▶ "
-		}
-
-		dot := "○"
-		if p.Online {
-			dot = "●"
-		}
+		isSelected := i == m.cursor
 
 		ip := ""
 		if len(p.TailscaleIPs) > 0 {
 			ip = p.TailscaleIPs[0]
 		}
 
-		extra := ""
-		if !p.Online && !p.LastSeen.IsZero() {
-			extra = "  " + formatLastSeen(p.LastSeen)
+		hn := fmt.Sprintf("%-20s", p.HostName)
+		if isSelected {
+			hn = styleBold.Render(hn)
 		}
 
-		fmt.Fprintf(&b, "%s%s %-20s %-16s %-10s%s\n",
-			cursor, dot, p.HostName, ip, p.OS, extra)
+		extra := ""
+		if !p.Online && !p.LastSeen.IsZero() {
+			extra = "  " + styleDim.Render(formatLastSeen(p.LastSeen))
+		}
+
+		fmt.Fprintf(&b, "%s%s %s %s %s%s\n",
+			cursor(isSelected),
+			onlineDot(p.Online),
+			hn,
+			styleDim.Render(fmt.Sprintf("%-16s", ip)),
+			styleDim.Render(fmt.Sprintf("%-10s", p.OS)),
+			extra,
+		)
 	}
 
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "  [enter] ping   [y] copy IP   [esc] back")
+	fmt.Fprintln(&b, "  "+styleDim.Render("[enter] ping   [y] copy IP   [esc] back"))
 	return b.String()
 }
 

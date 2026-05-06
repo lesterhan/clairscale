@@ -9,7 +9,7 @@ import (
 func (m Model) View() string {
 	switch m.screen {
 	case screenLoading:
-		return "\n  Loading...\n"
+		return "\n  " + styleDim.Render("Loading...") + "\n"
 	case screenDaemonDown:
 		return viewDaemonDown()
 	case screenDashboard:
@@ -25,15 +25,15 @@ func (m Model) View() string {
 func viewDaemonDown() string {
 	var b strings.Builder
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "  ✗ tailscaled is not running")
+	fmt.Fprintln(&b, "  "+styleError.Render("✗ tailscaled is not running"))
 	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, "  [s] Start daemon   [q] Quit")
+	fmt.Fprintln(&b, "  "+styleDim.Render("[s] Start daemon   [q] Quit"))
 	return b.String()
 }
 
 func viewDashboard(m Model) string {
 	if m.status == nil {
-		return "\n  Loading...\n"
+		return "\n  " + styleDim.Render("Loading...") + "\n"
 	}
 
 	s := m.status
@@ -44,10 +44,10 @@ func viewDashboard(m Model) string {
 		ip = self.TailscaleIPs[0]
 	}
 
-	exitNode := "none"
+	exitNode := styleDim.Render("none")
 	for _, p := range s.Peer {
 		if p.ExitNode {
-			exitNode = p.HostName
+			exitNode = styleActive.Render(p.HostName)
 			break
 		}
 	}
@@ -63,37 +63,50 @@ func viewDashboard(m Model) string {
 
 	var b strings.Builder
 	fmt.Fprintln(&b)
-	fmt.Fprintf(&b, "  %-24s %s\n", self.HostName, ip)
-	fmt.Fprintf(&b, "  tailnet: %-20s %s\n", s.CurrentTailnet.Name, connStateStr(s.BackendState))
+	fmt.Fprintf(&b, "  %s  %s\n",
+		styleTitle.Render(self.HostName),
+		styleDim.Render(ip),
+	)
+	fmt.Fprintf(&b, "  %s %s  %s\n",
+		styleLabel.Render("tailnet:"),
+		styleDim.Render(s.CurrentTailnet.Name),
+		connStateStr(s.BackendState),
+	)
 	fmt.Fprintln(&b)
-	fmt.Fprintf(&b, "  Exit node: %s\n", exitNode)
-	fmt.Fprintf(&b, "  Peers: %d online · %d offline\n", online, offline)
+	fmt.Fprintf(&b, "  %s %s\n", styleLabel.Render("Exit node:"), exitNode)
+	fmt.Fprintf(&b, "  %s %s · %s\n",
+		styleLabel.Render("Peers:"),
+		styleOnline.Render(fmt.Sprintf("%d online", online)),
+		styleOffline.Render(fmt.Sprintf("%d offline", offline)),
+	)
 	fmt.Fprintln(&b)
 
 	if m.fetchErr != nil {
 		ago := time.Since(m.lastFetch).Round(time.Second)
-		fmt.Fprintf(&b, "  Last updated %s ago — connection error\n", ago)
+		fmt.Fprintf(&b, "  %s\n",
+			styleError.Render(fmt.Sprintf("Last updated %s ago — connection error", ago)),
+		)
 		fmt.Fprintln(&b)
 	}
 
-	fmt.Fprintln(&b, "  [p] peers  [e] exit nodes  [u] up/down  [q] quit")
+	fmt.Fprintln(&b, "  "+styleDim.Render("[p] peers  [e] exit nodes  [u] up/down  [q] quit"))
 	return b.String()
 }
 
-func connStateStr(backendState string) string {
-	switch backendState {
+func connStateStr(state string) string {
+	switch state {
 	case "Running":
-		return "● Connected"
+		return styleConnected.Render("● Connected")
 	case "Stopped":
-		return "○ Tunnel down"
+		return styleWarning.Render("○ Tunnel down")
 	case "NeedsLogin":
-		return "○ Needs login"
+		return styleError.Render("○ Needs login")
 	case "Starting":
-		return "◌ Starting"
+		return styleWarning.Render("◌ Starting")
 	default:
-		if backendState == "" {
-			return "○ Unknown"
+		if state == "" {
+			return styleOffline.Render("○ Unknown")
 		}
-		return "○ " + backendState
+		return styleOffline.Render("○ " + state)
 	}
 }
