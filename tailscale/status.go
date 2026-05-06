@@ -11,6 +11,13 @@ import (
 
 const defaultSocketPath = "/var/run/tailscale/tailscaled.sock"
 
+type Location struct {
+	Country     string `json:"Country"`
+	CountryCode string `json:"CountryCode"`
+	City        string `json:"City"`
+	CityCode    string `json:"CityCode"`
+}
+
 type PeerStatus struct {
 	HostName       string    `json:"HostName"`
 	DNSName        string    `json:"DNSName"`
@@ -20,6 +27,7 @@ type PeerStatus struct {
 	LastSeen       time.Time `json:"LastSeen"`
 	ExitNodeOption bool      `json:"ExitNodeOption"`
 	ExitNode       bool      `json:"ExitNode"`
+	Location       *Location `json:"Location"`
 }
 
 type SelfStatus struct {

@@ -14,22 +14,25 @@ type setExitNodeMsg struct{ err error }
 type exitNodeRow struct {
 	hostName string
 	ip       string
+	country  string
+	city     string
 	active   bool
 	online   bool
 }
 
 type exitNodeModel struct {
-	rows       []exitNodeRow
+	allRows    []exitNodeRow
 	cursor     int
 	offset     int
 	viewHeight int
+	filterText string
 	setting    bool
 	err        string
 }
 
 func newExitNodeModel(status *tailscale.Status, height int) exitNodeModel {
 	return exitNodeModel{
-		rows:       buildExitNodeRows(status),
+		allRows:    buildExitNodeRows(status),
 		viewHeight: height,
 	}
 }
@@ -53,7 +56,15 @@ func buildExitNodeRows(status *tailscale.Status) []exitNodeRow {
 			candidates = append(candidates, p)
 		}
 	}
+
 	sort.Slice(candidates, func(i, j int) bool {
+		ci, cj := locationFields(candidates[i]), locationFields(candidates[j])
+		if ci[0] != cj[0] {
+			return ci[0] < cj[0]
+		}
+		if ci[1] != cj[1] {
+			return ci[1] < cj[1]
+		}
 		return candidates[i].HostName < candidates[j].HostName
 	})
 
@@ -62,14 +73,41 @@ func buildExitNodeRows(status *tailscale.Status) []exitNodeRow {
 		if len(p.TailscaleIPs) > 0 {
 			ip = p.TailscaleIPs[0]
 		}
+		country, city := locationFields(p)[0], locationFields(p)[1]
 		rows = append(rows, exitNodeRow{
 			hostName: p.HostName,
 			ip:       ip,
+			country:  country,
+			city:     city,
 			active:   ip != "" && ip == activeIP,
 			online:   p.Online,
 		})
 	}
 	return rows
+}
+
+func locationFields(p tailscale.PeerStatus) [2]string {
+	if p.Location == nil {
+		return [2]string{"", ""}
+	}
+	return [2]string{p.Location.Country, p.Location.City}
+}
+
+// filteredRows always keeps the "none" row at top; filter applies to exit node peers only.
+func (m exitNodeModel) filteredRows() []exitNodeRow {
+	if m.filterText == "" {
+		return m.allRows
+	}
+	f := strings.ToLower(m.filterText)
+	out := []exitNodeRow{m.allRows[0]}
+	for _, r := range m.allRows[1:] {
+		if strings.Contains(strings.ToLower(r.hostName), f) ||
+			strings.Contains(strings.ToLower(r.country), f) ||
+			strings.Contains(strings.ToLower(r.city), f) {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 func setExitNodeCmd(ip string) tea.Cmd {
@@ -79,7 +117,7 @@ func setExitNodeCmd(ip string) tea.Cmd {
 }
 
 func (m exitNodeModel) listHeight() int {
-	h := m.viewHeight - 7
+	h := m.viewHeight - 8
 	if h < 5 {
 		return 5
 	}
@@ -104,31 +142,57 @@ func (m exitNodeModel) update(msg tea.Msg) (exitNodeModel, tea.Cmd) {
 	if !ok {
 		return m, nil
 	}
+
+	visible := m.filteredRows()
+
 	switch key.String() {
-	case "up", "k":
+	case "up":
 		if m.cursor > 0 {
 			m.cursor--
 			m = m.clampOffset()
 		}
-	case "down", "j":
-		if m.cursor < len(m.rows)-1 {
+	case "down":
+		if m.cursor < len(visible)-1 {
 			m.cursor++
 			m = m.clampOffset()
 		}
 	case "enter":
-		row := m.rows[m.cursor]
-		m.setting = true
-		m.err = ""
-		return m, setExitNodeCmd(row.ip)
+		if m.cursor < len(visible) {
+			row := visible[m.cursor]
+			m.setting = true
+			m.err = ""
+			return m, setExitNodeCmd(row.ip)
+		}
 	case "esc":
-		return m, func() tea.Msg { return backMsg{} }
+		if m.filterText != "" {
+			m.filterText = ""
+			m.cursor = 0
+			m.offset = 0
+		} else {
+			return m, func() tea.Msg { return backMsg{} }
+		}
+	case "backspace":
+		if len(m.filterText) > 0 {
+			m.filterText = m.filterText[:len(m.filterText)-1]
+			m.cursor = 0
+			m.offset = 0
+		}
+	default:
+		if len(key.Runes) == 1 {
+			m.filterText += string(key.Runes)
+			m.cursor = 0
+			m.offset = 0
+			m.err = ""
+		}
 	}
 	return m, nil
 }
 
 func viewExitNodes(m exitNodeModel) string {
+	visible := m.filteredRows()
+
 	activeLabel := "none"
-	for _, r := range m.rows {
+	for _, r := range m.allRows {
 		if r.active && r.ip != "" {
 			activeLabel = r.hostName
 			break
@@ -140,14 +204,26 @@ func viewExitNodes(m exitNodeModel) string {
 	fmt.Fprintf(&b, "  Active: %s\n", activeLabel)
 	fmt.Fprintln(&b)
 
+	if m.filterText != "" {
+		peers := len(visible) - 1
+		fmt.Fprintf(&b, "  filter: %s_    %d result", m.filterText, peers)
+		if peers != 1 {
+			fmt.Fprint(&b, "s")
+		}
+		fmt.Fprintln(&b)
+	} else {
+		fmt.Fprintln(&b, "  type to filter by name, country, or city")
+	}
+	fmt.Fprintln(&b)
+
 	lh := m.listHeight()
 	end := m.offset + lh
-	if end > len(m.rows) {
-		end = len(m.rows)
+	if end > len(visible) {
+		end = len(visible)
 	}
 
 	for i := m.offset; i < end; i++ {
-		r := m.rows[i]
+		r := visible[i]
 
 		cursor := "  "
 		if i == m.cursor {
@@ -161,13 +237,14 @@ func viewExitNodes(m exitNodeModel) string {
 
 		check := ""
 		if r.active {
-			check = "  ✓"
+			check = "✓"
 		}
 
 		if r.ip == "" {
 			fmt.Fprintf(&b, "%s%s %s\n", cursor, dot, r.hostName)
 		} else {
-			fmt.Fprintf(&b, "%s%s %-28s %-16s%s\n", cursor, dot, r.hostName, r.ip, check)
+			fmt.Fprintf(&b, "%s%s %-22s %-16s %-18s %-16s %s\n",
+				cursor, dot, r.hostName, r.ip, r.country, r.city, check)
 		}
 	}
 
@@ -178,6 +255,6 @@ func viewExitNodes(m exitNodeModel) string {
 		fmt.Fprintf(&b, "  Error: %s\n", m.err)
 	}
 
-	fmt.Fprintln(&b, "  [enter] connect   [esc] back")
+	fmt.Fprintln(&b, "  [↑↓] navigate   [enter] connect   [esc] clear/back")
 	return b.String()
 }
