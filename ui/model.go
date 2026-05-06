@@ -14,6 +14,7 @@ const (
 	screenDaemonDown
 	screenDashboard
 	screenPeerList
+	screenExitNodes
 )
 
 type socketCheckMsg struct{ err error }
@@ -31,6 +32,7 @@ type Model struct {
 	lastFetch time.Time
 	fetchErr  error
 	peerList  peerListModel
+	exitNodes exitNodeModel
 }
 
 func Initial() Model {
@@ -66,11 +68,21 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.peerList.viewHeight = msg.Height
+		m.exitNodes.viewHeight = msg.Height
 		return m, nil
 
 	case backMsg:
 		m.screen = screenDashboard
 		return m, nil
+
+	case setExitNodeMsg:
+		if msg.err != nil {
+			m.exitNodes.setting = false
+			m.exitNodes.err = msg.err.Error()
+			return m, nil
+		}
+		m.screen = screenDashboard
+		return m, fetchStatusCmd()
 
 	case socketCheckMsg:
 		if msg.err != nil {
@@ -106,6 +118,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.peerList, cmd = m.peerList.update(msg)
 		return m, cmd
 
+	case screenExitNodes:
+		var cmd tea.Cmd
+		m.exitNodes, cmd = m.exitNodes.update(msg)
+		return m, cmd
+
 	default:
 		key, ok := msg.(tea.KeyMsg)
 		if !ok {
@@ -118,6 +135,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.screen == screenDashboard && m.status != nil {
 				m.peerList = newPeerListModel(m.status, m.height)
 				m.screen = screenPeerList
+			}
+		case "e":
+			if m.screen == screenDashboard && m.status != nil {
+				m.exitNodes = newExitNodeModel(m.status, m.height)
+				m.screen = screenExitNodes
 			}
 		}
 	}

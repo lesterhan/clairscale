@@ -16,6 +16,8 @@ func (m Model) View() string {
 		return viewDashboard(m)
 	case screenPeerList:
 		return viewPeerList(m.peerList)
+	case screenExitNodes:
+		return viewExitNodes(m.exitNodes)
 	}
 	return ""
 }
