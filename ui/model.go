@@ -25,18 +25,22 @@ type statusMsg struct {
 type tickMsg time.Time
 
 type Model struct {
-	screen    screen
-	width     int
-	height    int
-	status    *tailscale.Status
-	lastFetch time.Time
-	fetchErr  error
-	peerList  peerListModel
-	exitNodes exitNodeModel
+	screen     screen
+	width      int
+	height     int
+	status     *tailscale.Status
+	lastFetch  time.Time
+	fetchErr   error
+	peerList   peerListModel
+	exitNodes  exitNodeModel
+	canManage  bool
 }
 
 func Initial() Model {
-	return Model{screen: screenLoading}
+	return Model{
+		screen:    screenLoading,
+		canManage: tailscale.CanManage(),
+	}
 }
 
 func (m Model) Init() tea.Cmd {
@@ -129,7 +133,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		switch key.String() {
-		case "ctrl+c", "q":
+		case "ctrl+c", "q", "esc":
 			return m, tea.Quit
 		case "p":
 			if m.screen == screenDashboard && m.status != nil {
