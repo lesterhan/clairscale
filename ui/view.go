@@ -94,7 +94,10 @@ func viewDashboard(m Model) string {
 			styleWarning.Render("⚠ Not root or in the tailscale group — exit node changes will fail"),
 		)
 		fmt.Fprintf(&b, "  %s\n",
-			styleDim.Render("  Fix: sudo usermod -aG tailscale $USER  (then log out and back in)"),
+			styleDim.Render("  Fix: sudo tailscale set --operator=$USER  (one-time, no group needed)"),
+		)
+		fmt.Fprintf(&b, "  %s\n",
+			styleDim.Render("   Or: sudo usermod -aG tailscale $USER  (then log out and back in)"),
 		)
 		fmt.Fprintln(&b)
 	}

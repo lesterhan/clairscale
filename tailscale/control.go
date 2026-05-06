@@ -18,22 +18,24 @@ func SetExitNode(ip string) error {
 }
 
 // CanManage returns true if the process can perform Tailscale management operations.
-// Requires root or membership in the 'tailscale' group (which owns the socket).
+// On distros that use a 'tailscale' group (Debian/Ubuntu), checks group membership.
+// If the group doesn't exist, access is assumed to be open (Arch, NixOS, etc.).
 func CanManage() bool {
 	if os.Getuid() == 0 {
 		return true
 	}
 	g, err := user.LookupGroup("tailscale")
 	if err != nil {
-		return false
+		// No tailscale group — socket access is not group-restricted on this distro.
+		return true
 	}
 	cur, err := user.Current()
 	if err != nil {
-		return false
+		return true
 	}
 	gids, err := cur.GroupIds()
 	if err != nil {
-		return false
+		return true
 	}
 	for _, gid := range gids {
 		if gid == g.Gid {
